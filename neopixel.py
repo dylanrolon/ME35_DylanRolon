@@ -5,6 +5,10 @@ lights = neopixel.NeoPixel(Pin(15),2) # 0 is the Pin for neopixel and 4 is the n
 lights[0] = (0,20,20) # set the color of 0th light to purple
 lights[1] = (20,0,0)
 lights.write()
+time.sleep_ms(1000)
 
+lights[0] = (0,0,0) # set the color of 0th light to purple
+lights[1] = (0,0,0)
+lights.write()
 
 
