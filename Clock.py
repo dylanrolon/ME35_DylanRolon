@@ -48,18 +48,15 @@ TIME_API_URL = "https://timeapi.io/api/time/current/zone?timeZone=America%2FLos_
 # (matching set_servo_angle's hour_12 * 15), so 6 sits at 90 degrees.
 # Digit d points to angle d * 15; 10 doubles as a separator shown between
 # digits (at the "10 o'clock" mark).
-# Example: 78 -> point to 7 (105 deg), then 10 (150 deg), then 8 (120 deg).
 DIGIT_UNIT_DEGREES = 15
 SEPARATOR_VALUE = 10
 DIGIT_HOLD_MS = 1000
 SEPARATOR_HOLD_MS = 500
-# -# BUTTONS
+
 TEMP_BUTTON_PIN = 34        # press: show current temperature on demand, then resume clock
 TIME_TEST_BUTTON_PIN = 35   # press: type in a time, servo previews it, then resumes clock
 
-# GPIO 34 and 35 need external pull-down resistors.
 BUTTON_DEBOUNCE_MS = 300
-# -
 servo = PWM(Pin(SERVO_PIN), freq=50)
 lights = neopixel.NeoPixel(Pin(NEOPIXEL_PIN), NUM_PIXELS)
 
@@ -96,9 +93,6 @@ def angle_to_duty(angle):
     # Correct for the dial being mounted 30 minutes ahead of true.
     angle = angle - CALIBRATION_OFFSET_DEGREES
     angle = max(0, min(180, angle))
-    # Reversed on purpose: the servo was sweeping counterclockwise for
-    # increasing angle, so this flips it to sweep clockwise instead.
-    # The midpoint (angle=90, e.g. "6") is unaffected either way.
     return int(SERVO_MAX_DUTY - (SERVO_MAX_DUTY - SERVO_MIN_DUTY) * angle / 180)
 
 def write_servo_angle(angle):
@@ -153,9 +147,9 @@ def set_lights(hour):
     lights[0] = color
     lights[1] = color
     lights.write()
-# -
+
 # WiFi + weather (only used for the periodic temperature check)
-# -
+
 def connect_wifi():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
@@ -179,23 +173,12 @@ def get_cupertino_temperature():
     except Exception as e:
         print("Weather fetch failed:", e)
         return None
-# -
+
 # Temperature display
-# -
+
 def move_to_position(position):
     """Move the servo directly to a dial position (0-10) in one command,
-    then wait for it to physically finish arriving.
-
-    Previously this sent a new intermediate setpoint every ~15ms to fake
-    a smooth sweep. On real hardware that meant the servo was constantly
-    being re-targeted before it finished responding to the last command,
-    so it could end up resting slightly short of (or past) the true
-    target depending on where it was in that chase when the final
-    setpoint landed -- which is exactly the "off by one digit position"
-    behavior you were seeing. Sending the target once and then waiting
-    a distance-scaled settle time lets the servo's own internal motion
-    actually finish before we move on.
-    """
+    then wait for it to physically finish arriving."""
     target_angle = position * DIGIT_UNIT_DEGREES
     distance = abs(target_angle - _current_logical_angle)
     write_servo_angle(target_angle)
@@ -243,15 +226,12 @@ def test_time_on_servo(hold_seconds=3):
 def main():
     global temp_button_pressed, time_test_button_pressed
 
-    # Connect to WiFi right away on boot, rather than waiting for the first
-    # temperature check (30 minutes in) or a D34 press. This also needs to
-    # happen before get_start_time() so the time API call below can reach
-    # the network.
+    # Connect to WiFi right away on boot, rather than waiting for the first temperature check 
     connect_wifi()
 
     start_hour, start_minute = get_start_time()
     start_time = time.time()
-    last_temp_trigger_minute = None  # tracks which :00/:30 mark we've already fired on
+    last_temp_trigger_minute = None  # tracks which :00/:30 mark that has occured.
 
     while True:
         elapsed_minutes = (time.time() - start_time) / 60
@@ -265,9 +245,6 @@ def main():
         print("Time: {:02d}:{:02d}  Angle: {:.1f}".format(hour, minute, angle))
 
         # Show the temperature whenever the DISPLAYED clock hits :00 or :30,
-        # not on a fixed real-time timer. The last_temp_trigger_minute check
-        # makes sure it only fires once per mark, not on every loop while the
-        # minute is still sitting at 0 or 30.
         if minute in (0, 30) and minute != last_temp_trigger_minute:
             show_cupertino_temperature()
             last_temp_trigger_minute = minute
